@@ -3,6 +3,13 @@
 use soroban_sdk::{contract, contracttype, contractimpl, contracterror, symbol_short, Address, Env, Symbol};
 pub const TOKEN_ADMIN: Symbol = symbol_short!("t_admin");
 
+pub const DAY_IN_LEDGERS: u32 = 17280;
+pub const INSTANCE_BUMP_AMOUNT: u32 = 7 * DAY_IN_LEDGERS;
+pub const INSTANCE_LIFETIME_THRESHOLD: u32 = INSTANCE_BUMP_AMOUNT - DAY_IN_LEDGERS;
+
+pub const BALANCE_BUMP_AMOUNT: u32 = 30 * DAY_IN_LEDGERS;
+pub const BALANCE_LIFETIME_THRESHOLD: u32 = BALANCE_BUMP_AMOUNT - DAY_IN_LEDGERS;
+
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
@@ -30,6 +37,10 @@ fn has_admin(e: &Env) -> bool {
 fn get_balance(e: &Env, addr: Address)-> u32 {
     let key = DataKey::Balance(addr);
     if let Some(b) = e.storage().persistent().get::<DataKey, u32>(&key) {
+        e.storage()
+            .persistent()
+            .extend_ttl(&key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
+
         return b;
     }
 
@@ -62,6 +73,10 @@ impl BallotToken {
             return Err(Error::AddressAlreadyHoldsToken);
         }
 
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
         let key = DataKey::Balance(addr.clone());
         let amount: u32 = 1;
         e.storage().persistent().set(&key, &amount);
@@ -69,6 +84,10 @@ impl BallotToken {
     }
 
     pub fn balance(e: Env, addr: Address) -> u32 {
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
         let b: u32 = get_balance(&e, addr);
         b
     }
@@ -84,12 +103,19 @@ impl BallotToken {
             return Err(Error::AddressAlreadyHoldsToken);
         }
 
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
         let from_key = DataKey::Balance(from.clone());
         let to_key   = DataKey::Balance(to.clone());
         let amount: u32 = 1;
 
         e.storage().persistent().remove(&from_key);
         e.storage().persistent().set(&to_key, &amount);
+        e.storage()
+            .persistent()
+            .extend_ttl(&to_key, BALANCE_LIFETIME_THRESHOLD, BALANCE_BUMP_AMOUNT);
 
         Ok(true)
     }
@@ -133,6 +159,11 @@ impl BallotToken {
     }
 
     pub fn allowance(e: &Env, from: Address) -> bool {
+
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
         let allowance_key = DataKey::Allowance(from);
         if let Some(_a) = e.storage().temporary().get::<_, Address>(&allowance_key) {
             return true;
@@ -142,6 +173,11 @@ impl BallotToken {
     }
 
     pub fn blocking(e: &Env, from: Address) -> bool {
+
+        e.storage()
+            .instance()
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
+
         let blocking_key = DataKey::Blocking(from);
         if let Some(_b) = e.storage().temporary().get::<_, Address>(&blocking_key) {
             return true;
@@ -153,9 +189,10 @@ impl BallotToken {
     pub fn burn(e: Env, addr: Address) {
         let admin: Address = e.storage().instance().get(&TOKEN_ADMIN).unwrap();
         admin.require_auth();
-        /*e.storage()
+
+        e.storage()
             .instance()
-            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);*/
+            .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
         let from_key = DataKey::Balance(addr);
         e.storage().persistent().remove(&from_key);
