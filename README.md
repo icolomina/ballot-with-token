@@ -20,7 +20,7 @@ soroban contract build
 ```
 
 ## Testing the Ballot contract
-The Ballot contract needs the token wasm file to run so, as we have generated it, we can now test the ballot contract. Go to the Ballot folder and execute the tests and we did before:
+The Ballot contract needs the token wasm file to run so, as we have generated it, we can now test the ballot contract. Go to the Ballot folder and execute the tests as we did before:
 
 ```shell
 cargo test
