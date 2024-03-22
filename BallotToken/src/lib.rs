@@ -47,6 +47,25 @@ fn get_balance(e: &Env, addr: Address)-> u32 {
     0
 }
 
+fn get_allowance(e: &Env, addr: Address) -> bool {
+    let allowance_key = DataKey::Allowance(addr);
+    if let Some(_a) = e.storage().temporary().get::<_, Address>(&allowance_key) {
+        return true;
+    }
+
+    false
+}
+
+fn get_blocking(e: &Env, addr: Address) -> bool {
+    let blocking_key = DataKey::Blocking(addr);
+    if let Some(_b) = e.storage().temporary().get::<_, Address>(&blocking_key) {
+        return true;
+    }
+
+    false
+}
+
+
 #[contract]
 pub struct BallotToken;
 
@@ -111,7 +130,7 @@ impl BallotToken {
         let to_key   = DataKey::Balance(to.clone());
         let amount: u32 = 1;
 
-        e.storage().persistent().remove(&from_key);
+        e.storage().persistent().remove(&from_key); // from toklen is burned
         e.storage().persistent().set(&to_key, &amount);
         e.storage()
             .persistent()
@@ -126,11 +145,11 @@ impl BallotToken {
             return Err(Error::ExpirationLedgerLessThanCurrentLedger);
         }
 
-        if Self::blocking(&e, from.clone()) {
+        if get_blocking(&e, from.clone()) {
             return Err(Error::AddressAlreadyHasAllowance);
         }
 
-        if Self::allowance(&e, spender.clone()) {
+        if get_allowance(&e, spender.clone()) {
             return Err(Error::AddressAlreadyHasAllowance);
         }
 
@@ -144,8 +163,8 @@ impl BallotToken {
 
         let allowance_key = DataKey::Allowance(spender.clone());
         let blocking_key  = DataKey::Blocking(from.clone());
-        e.storage().temporary().set(&allowance_key, &spender);
-        e.storage().temporary().set(&blocking_key, &from);
+        e.storage().temporary().set(&allowance_key, &from);
+        e.storage().temporary().set(&blocking_key, &spender);
 
         let live_for = expiration
             .checked_sub(e.ledger().sequence())
@@ -158,32 +177,24 @@ impl BallotToken {
         Ok(true)
     }
 
-    pub fn allowance(e: &Env, from: Address) -> bool {
+    pub fn allowance(e: &Env, addr: Address) -> bool {
 
         e.storage()
             .instance()
             .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        let allowance_key = DataKey::Allowance(from);
-        if let Some(_a) = e.storage().temporary().get::<_, Address>(&allowance_key) {
-            return true;
-        }
-
-        false
+        let allowance = get_allowance(&e, addr);
+        allowance
     }
 
-    pub fn blocking(e: &Env, from: Address) -> bool {
+    pub fn blocking(e: &Env, addr: Address) -> bool {
 
         e.storage()
             .instance()
             .extend_ttl(INSTANCE_LIFETIME_THRESHOLD, INSTANCE_BUMP_AMOUNT);
 
-        let blocking_key = DataKey::Blocking(from);
-        if let Some(_b) = e.storage().temporary().get::<_, Address>(&blocking_key) {
-            return true;
-        }
-
-        false
+        let blocking = get_blocking(e, addr);
+        blocking
     }
 
     pub fn burn(e: Env, addr: Address) {
