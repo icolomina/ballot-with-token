@@ -25,3 +25,6 @@ The Ballot contract needs the token wasm file to run so, as we have generated it
 ```shell
 cargo test
 ```
+
+## More info
+Check this link to get more info about this repo: https://dev.to/icolomina/using-tokenization-to-control-a-soroban-voting-smart-contract-3lm6
